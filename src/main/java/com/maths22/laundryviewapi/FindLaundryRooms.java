@@ -34,6 +34,17 @@ public class FindLaundryRooms {
     @GET
     @Produces(MediaType.APPLICATION_JSON)
     public String lookup(@PathParam("schoolId") String schoolId) {
+        if (schoolId.matches("^r_.*$")) {
+            String roomId = schoolId.substring(2);
+            JsonBuilderFactory factory = Json.createBuilderFactory(null);
+            JsonArrayBuilder ret = factory.createArrayBuilder();
+            String name = "Default";
+            ret.add(factory.createObjectBuilder()
+                    .add("id", roomId)
+                    .add("name", name));
+            return ret.build().toString();
+        }
+
         ClientConfig cc = new ClientConfig().property(ClientProperties.FOLLOW_REDIRECTS, false);
         Client client = ClientBuilder.newClient(cc);
 
