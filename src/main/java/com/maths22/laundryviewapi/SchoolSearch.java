@@ -1,5 +1,6 @@
 package com.maths22.laundryviewapi;
 
+import com.maths22.laundryviewapi.data.School;
 import org.apache.commons.lang3.text.WordUtils;
 import org.glassfish.jersey.client.ClientConfig;
 import org.glassfish.jersey.client.ClientProperties;
@@ -15,13 +16,15 @@ import javax.ws.rs.client.WebTarget;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import java.io.StringReader;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.Callable;
 
 /**
  * Created by Jacob on 1/17/2016.
  */
 public class SchoolSearch {
-    public static class SearchByName implements Callable<JsonArray> {
+    public static class SearchByName implements Callable<List<School>> {
         private final String name;
 
         public SearchByName(String name) {
@@ -29,7 +32,7 @@ public class SchoolSearch {
         }
 
         @Override
-        public JsonArray call() throws Exception {
+        public List<School> call() throws Exception {
             Client client = ClientBuilder.newClient();
             WebTarget target = client.target("http://m.laundryview.com").path("submitFunctions.php").queryParam("q", name);
 
@@ -48,25 +51,23 @@ public class SchoolSearch {
                 throw new WebApplicationException("LaundryView Request Failed", Response.Status.INTERNAL_SERVER_ERROR);
             }
 
-            JsonBuilderFactory factory = Json.createBuilderFactory(null);
-            JsonArrayBuilder ret = factory.createArrayBuilder();
+            List<School> ret = new ArrayList<>();
 
             if (list instanceof JsonObject) {
-                return ret.build();
+                return ret;
             } else {
                 JsonArray schools = (JsonArray) list;
                 for (JsonValue schoolV : schools) {
                     JsonObject school = (JsonObject) schoolV;
-                    ret.add(factory.createObjectBuilder()
-                            .add("id", school.getString("school_desc_key"))
-                            .add("name", WordUtils.capitalizeFully(school.getString("property_name"), ' ', '-')));
+                    ret.add(new School(school.getString("school_desc_key"),
+                            WordUtils.capitalizeFully(school.getString("property_name"), ' ', '-')));
                 }
-                return ret.build();
+                return ret;
             }
         }
     }
 
-    public static class SearchBySId implements Callable<JsonArray> {
+    public static class SearchBySId implements Callable<List<School>> {
         private final String sId;
 
         public SearchBySId(String sId) {
@@ -74,7 +75,7 @@ public class SchoolSearch {
         }
 
         @Override
-        public JsonArray call() throws Exception {
+        public List<School> call() throws Exception {
             ClientConfig cc = new ClientConfig().property(ClientProperties.FOLLOW_REDIRECTS, false);
             Client client = ClientBuilder.newClient(cc);
 
@@ -82,9 +83,7 @@ public class SchoolSearch {
 
             Response response = target.request(MediaType.TEXT_HTML_TYPE).get();
 
-
-            JsonBuilderFactory factory = Json.createBuilderFactory(null);
-            JsonArrayBuilder ret = factory.createArrayBuilder();
+            List<School> ret = new ArrayList<>();
 
             if (response.getStatus() == 200) {
                 try {
@@ -93,23 +92,20 @@ public class SchoolSearch {
                     Elements items = doc.getElementById("rooms").children();
 
                     if (items.size() > 0) {
-                        ret.add(factory.createObjectBuilder()
-                                .add("id", sId)
-                                .add("name", "School #" + sId));
+                        String name = items.get(0).text();
+                        ret.add(new School(sId, WordUtils.capitalizeFully(name)));
                     }
                 } catch (Exception ex) {
                     ex.printStackTrace();
                 }
             } else if (response.getStatus() == 302) {
-                ret.add(factory.createObjectBuilder()
-                        .add("id", sId)
-                        .add("name", "School #" + sId));
+                ret.add(new School(sId, "School #" + sId));
             }
-            return ret.build();
+            return ret;
         }
     }
 
-    public static class SearchByRId implements Callable<JsonArray> {
+    public static class SearchByRId implements Callable<List<School>> {
         private final String rId;
 
         public SearchByRId(String rId) {
@@ -117,7 +113,7 @@ public class SchoolSearch {
         }
 
         @Override
-        public JsonArray call() throws Exception {
+        public List<School> call() throws Exception {
             Client client = ClientBuilder.newClient();
             WebTarget target = client.target("http://m.laundryview.com")
                     .path("submitFunctions.php")
@@ -126,8 +122,7 @@ public class SchoolSearch {
 
             Response response = target.request(MediaType.TEXT_HTML_TYPE).get();
 
-            JsonBuilderFactory factory = Json.createBuilderFactory(null);
-            JsonArrayBuilder ret = factory.createArrayBuilder();
+            List<School> ret = new ArrayList<>();
 
             if (response.getStatus() == 200) {
                 try {
@@ -135,16 +130,14 @@ public class SchoolSearch {
                     JsonObject error = Json.createReader(new StringReader(text)).readObject();
                 } catch (Exception ex) {
                     //The server only returns JSON on errors!
-                    ret.add(factory.createObjectBuilder()
-                            .add("id", "r_" + rId)
-                            .add("name", "Laundry room #" + rId));
+                    ret.add(new School("r_" + rId, "Laundry room #" + rId));
                 }
             }
-            return ret.build();
+            return ret;
         }
     }
 
-    public static class SearchByLink implements Callable<JsonArray> {
+    public static class SearchByLink implements Callable<List<School>> {
         private final String link;
 
         public SearchByLink(String link) {
@@ -152,7 +145,7 @@ public class SchoolSearch {
         }
 
         @Override
-        public JsonArray call() throws Exception {
+        public List<School> call() throws Exception {
             ClientConfig cc = new ClientConfig().property(ClientProperties.FOLLOW_REDIRECTS, false);
             Client client = ClientBuilder.newClient(cc);
             WebTarget target = client.target("http://m.laundryview.com")
@@ -160,16 +153,12 @@ public class SchoolSearch {
 
             Response response = target.request(MediaType.TEXT_HTML_TYPE).get();
 
-            JsonBuilderFactory factory = Json.createBuilderFactory(null);
-            JsonArrayBuilder ret = factory.createArrayBuilder();
-
+            List<School> ret = new ArrayList<>();
             if (response.getStatus() == 302) {
                 String id = response.getHeaderString("Location").split("=")[1];
-                ret.add(factory.createObjectBuilder()
-                        .add("id", id)
-                        .add("name", link));
+                ret.add(new School(id, link));
             }
-            return ret.build();
+            return ret;
         }
     }
 }

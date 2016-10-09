@@ -1,13 +1,19 @@
 package com.maths22.laundryviewapi;
 
+import com.google.appengine.api.ThreadManager;
+import com.google.appengine.api.memcache.stdimpl.GCacheFactory;
+import com.maths22.laundryviewapi.data.School;
+
+import javax.cache.Cache;
+import javax.cache.CacheException;
+import javax.cache.CacheFactory;
+import javax.cache.CacheManager;
 import javax.json.*;
 import javax.ws.rs.*;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.FutureTask;
+import java.util.*;
+import java.util.concurrent.*;
 
 /**
  * Root resource (exposed at "myresource" path)
@@ -24,39 +30,29 @@ public class FindSchools {
      */
     @GET
     @Produces(MediaType.APPLICATION_JSON)
-    public String lookup(@PathParam("name") String name) {
-        if (!isValidLookupName(name)) {
-            throw new WebApplicationException("Invalid School Name (minimum 3 characters)", Response.Status.BAD_REQUEST);
-        }
+    public List<School> lookup(@PathParam("name") String name) {
 
-        ExecutorService executor = Executors.newCachedThreadPool();
+        ExecutorService executor = Executors.newCachedThreadPool(ThreadManager.currentRequestThreadFactory());
 
-        FutureTask<JsonArray> nameSearch = new FutureTask<>(new SchoolSearch.SearchByName(name));
-        FutureTask<JsonArray> sIdSearch = new FutureTask<>(new SchoolSearch.SearchBySId(name));
-        FutureTask<JsonArray> rIdSearch = new FutureTask<>(new SchoolSearch.SearchByRId(name));
-        FutureTask<JsonArray> linkSearch = new FutureTask<>(new SchoolSearch.SearchByLink(name));
+        FutureTask<List<School>> nameSearch = new FutureTask<>(new SchoolSearch.SearchByName(name));
+        FutureTask<List<School>> sIdSearch = new FutureTask<>(new SchoolSearch.SearchBySId(name));
+        FutureTask<List<School>> rIdSearch = new FutureTask<>(new SchoolSearch.SearchByRId(name));
+        FutureTask<List<School>> linkSearch = new FutureTask<>(new SchoolSearch.SearchByLink(name));
 
         executor.execute(nameSearch);
-        executor.execute(sIdSearch);
-        executor.execute(rIdSearch);
         executor.execute(linkSearch);
 
-        JsonArray nameSearchResults = null;
-        JsonArray sIdSearchResults = null;
-        JsonArray rIdSearchResults = null;
-        JsonArray linkSearchResults = null;
+        if(name.matches("^\\d+$")) {
+            executor.execute(sIdSearch);
+            executor.execute(rIdSearch);
+        }
+
+        List<School> nameSearchResults = new ArrayList<>();
+        List<School> sIdSearchResults = new ArrayList<>();
+        List<School> rIdSearchResults = new ArrayList<>();
+        List<School> linkSearchResults = new ArrayList<>();
         try {
             nameSearchResults = nameSearch.get();
-        } catch (InterruptedException | ExecutionException e) {
-            e.printStackTrace();
-        }
-        try {
-            sIdSearchResults = sIdSearch.get();
-        } catch (InterruptedException | ExecutionException e) {
-            e.printStackTrace();
-        }
-        try {
-            rIdSearchResults = rIdSearch.get();
         } catch (InterruptedException | ExecutionException e) {
             e.printStackTrace();
         }
@@ -66,31 +62,36 @@ public class FindSchools {
             e.printStackTrace();
         }
 
-        JsonBuilderFactory factory = Json.createBuilderFactory(null);
-        JsonArrayBuilder ret = factory.createArrayBuilder();
+        if(name.matches("^\\d+$")) {
+            try {
+                sIdSearchResults = sIdSearch.get();
+            } catch (InterruptedException | ExecutionException e) {
+                e.printStackTrace();
+            }
+            try {
+                rIdSearchResults = rIdSearch.get();
+            } catch (InterruptedException | ExecutionException e) {
+                e.printStackTrace();
+            }
+        }
+        executor.shutdown();
+
+        List<School> ret = new ArrayList<>();
 
         if (nameSearchResults != null) {
-            for (JsonValue obj : nameSearchResults) {
-                ret.add(obj);
-            }
+           ret.addAll(nameSearchResults);
         }
         if (sIdSearchResults != null) {
-            for (JsonValue obj : sIdSearchResults) {
-                ret.add(obj);
-            }
+            ret.addAll(sIdSearchResults);
         }
         if (rIdSearchResults != null) {
-            for (JsonValue obj : rIdSearchResults) {
-                ret.add(obj);
-            }
+            ret.addAll(rIdSearchResults);
         }
         if (linkSearchResults != null) {
-            for (JsonValue obj : linkSearchResults) {
-                ret.add(obj);
-            }
+            ret.addAll(linkSearchResults);
         }
 
-        return ret.build().toString();
+        return ret;
     }
 
     private boolean isValidLookupName(String name) {
