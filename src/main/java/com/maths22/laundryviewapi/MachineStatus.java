@@ -14,16 +14,14 @@ import javax.cache.Cache;
 import javax.cache.CacheException;
 import javax.cache.CacheFactory;
 import javax.cache.CacheManager;
-import javax.json.Json;
-import javax.json.JsonArrayBuilder;
-import javax.json.JsonBuilderFactory;
-import javax.json.JsonObjectBuilder;
+import javax.json.*;
 import javax.ws.rs.*;
 import javax.ws.rs.client.Client;
 import javax.ws.rs.client.ClientBuilder;
 import javax.ws.rs.client.WebTarget;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import java.io.StringReader;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -48,61 +46,95 @@ public class MachineStatus {
 
 
         Client client = ClientBuilder.newClient();
-        WebTarget target = client.target("http://m.laundryview.com")
-                .path("submitFunctions.php")
-                .queryParam("monitor", "true")
-                .queryParam("lr", roomId);
+        WebTarget target = client.target("https://laundryview.com")
+                .path("api/currentRoomData")
+                .queryParam("location", roomId);
 
-        Response response = target.request(MediaType.TEXT_HTML_TYPE).get();
+        Response response = target.request(MediaType.APPLICATION_JSON).get();
 
         RoomMachineStatus ret = new RoomMachineStatus();
 
         if (response.getStatus() == 200) {
             try {
                 String text = response.readEntity(String.class);
-                Document doc = Jsoup.parse(text);
+                JsonReaderFactory readerFactory = Json.createReaderFactory(null);
+                JsonObject rootObj = readerFactory.createReader(new StringReader(text)).readObject();
 
-                Elements items = doc.body().children();
 
-                JsonBuilderFactory factory = Json.createBuilderFactory(null);
-                JsonObjectBuilder objBuilder = factory.createObjectBuilder();
-                List<Machine> currentList = ret.getWashers();
+                for (JsonValue item : rootObj.getJsonArray("objects")) {
+                    JsonObject obj = (JsonObject) item;
 
-                for (Element item : items) {
-                    if (item.id().equals("washer")) {
-                    } else if (item.id().equals("dryer")) {
-                        currentList = ret.getDryers();
-                    } else {
-                        String id = item.child(0).attr("id");
-                        String number = item.child(0).ownText().replace("\u00A0", "");
-                        String status = item.child(0).child(2).ownText();
+                    if(obj.containsKey("appliance_type")) {
+                        String itemType = obj.getString("appliance_type");
+                        String id = obj.getString("appliance_desc_key");
+                        String number = obj.getString("appliance_desc");
+                        String status = obj.getString("time_left_lite");
                         Status retStatus;
-                        if (status.equals("Avail")) {
+                        if (status.startsWith("Avail")) {
                             retStatus = Status.AVAILBLE;
-                        } else if (status.endsWith("mins left")) {
+                        } else if (status.endsWith("min remaining")) {
                             retStatus = Status.IN_USE;
                         } else if (status.equals("Idle")) {
                             retStatus = Status.DONE;
-                        } else if (status.equals("Extended Cycle")) {
+                        } else if (status.equals("Ext. Cycle")) {
                             retStatus = Status.IN_USE;
-                        } else if (status.equals("Out of service")) {
+                        } else if (status.equals("Unavailable")) {
                             retStatus = Status.OUT_OF_SERVICE;
                         } else {
                             retStatus = Status.UNKNOWN;
                             //TODO add logger
                         }
-                        String name = WordUtils.capitalizeFully(item.child(0).ownText(), ' ', '-');
 
                         Machine machine = new Machine(id, number, retStatus);
 
-                        if (retStatus.equals(Status.IN_USE) && !status.equals("Extended Cycle")) {
-                            machine.setTimeRemaining(Integer.parseInt(status.split("\\s+")[0]));
+                        if (retStatus.equals(Status.IN_USE) && !status.equals("Ext. Cycle")) {
+                            machine.setTimeRemaining(obj.getInt("time_remaining"));
                         }
-                        currentList.add(machine);
+                        if(itemType.equals("D")) {
+                            ret.getDryers().add(machine);
+                        } else {
+                            ret.getWashers().add(machine);
+                        }
                     }
+
+                    if(obj.containsKey("appliance_type2")) {
+                        String itemType = obj.getString("appliance_type2");
+                        String id = obj.getString("appliance_desc_key2");
+                        String number = obj.getString("appliance_desc2");
+                        String status = obj.getString("time_left_lite2");
+                        Status retStatus;
+                        if (status.startsWith("Avail")) {
+                            retStatus = Status.AVAILBLE;
+                        } else if (status.endsWith("min remaining")) {
+                            retStatus = Status.IN_USE;
+                        } else if (status.equals("Idle")) {
+                            retStatus = Status.DONE;
+                        } else if (status.equals("Ext. Cycle")) {
+                            retStatus = Status.IN_USE;
+                        } else if (status.equals("Unavailable")) {
+                            retStatus = Status.OUT_OF_SERVICE;
+                        } else {
+                            retStatus = Status.UNKNOWN;
+                            //TODO add logger
+                        }
+
+                        Machine machine = new Machine(id, number, retStatus);
+
+                        if (retStatus.equals(Status.IN_USE) && !status.equals("Ext. Cycle")) {
+                            machine.setTimeRemaining(obj.getInt("time_remaining2"));
+                        }
+                        if(itemType.equals("D")) {
+                            ret.getDryers().add(machine);
+                        } else {
+                            ret.getWashers().add(machine);
+                        }
+                    }
+
+
                 }
             } catch (Exception ex) {
                 //TODO catch something here
+                ex.printStackTrace();
             }
         } else {
             throw new WebApplicationException("LaundryView Request Failed", Response.Status.INTERNAL_SERVER_ERROR);

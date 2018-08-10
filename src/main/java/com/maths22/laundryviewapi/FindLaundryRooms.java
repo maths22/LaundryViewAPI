@@ -11,9 +11,7 @@ import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
 
 import javax.cache.*;
-import javax.json.Json;
-import javax.json.JsonArrayBuilder;
-import javax.json.JsonBuilderFactory;
+import javax.json.*;
 import javax.ws.rs.*;
 import javax.ws.rs.client.Client;
 import javax.ws.rs.client.ClientBuilder;
@@ -21,6 +19,7 @@ import javax.ws.rs.client.WebTarget;
 import javax.ws.rs.core.CacheControl;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import java.io.StringReader;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
 
@@ -42,54 +41,40 @@ public class FindLaundryRooms {
     public List<LaundryRoom> lookup(@PathParam("schoolId") String schoolId) {
 
         List<LaundryRoom> ret = new ArrayList<>();
-        if (schoolId.matches("^r_.*$")) {
-            String roomId = schoolId.substring(2);
-            String name = "Default";
-            ret.add(new LaundryRoom(roomId, name));
-        } else {
 
-            ClientConfig cc = new ClientConfig().property(ClientProperties.FOLLOW_REDIRECTS, false);
-            Client client = ClientBuilder.newClient(cc);
+        ClientConfig cc = new ClientConfig().property(ClientProperties.FOLLOW_REDIRECTS, false);
+        Client client = ClientBuilder.newClient(cc);
 
-            WebTarget target = client.target("http://m.laundryview.com").path("lvs.php").queryParam("s", schoolId);
+        WebTarget target = client.target("https://laundryview.com/").path("api/c_room").queryParam("loc", schoolId);
 
-            Response response = target.request(MediaType.TEXT_HTML_TYPE).get();
+        Response response = target.request(MediaType.APPLICATION_JSON).get();
 
-            if (response.getStatus() == 200) {
-                try {
-                    String text = response.readEntity(String.class);
-                    Document doc = Jsoup.parse(text);
-                    Elements items = doc.getElementById("rooms").children();
+        if (response.getStatus() == 200) {
+            try {
+                String text = response.readEntity(String.class);
+                JsonReaderFactory readerFactory = Json.createReaderFactory(null);
+                JsonObject obj = readerFactory.createReader(new StringReader(text)).readObject();
 
-                    JsonBuilderFactory factory = Json.createBuilderFactory(null);
-                    JsonArrayBuilder results = factory.createArrayBuilder();
-                    for (Element item : items) {
-                        if (item.children().size() > 0) {
-                            String id = item.child(0).attr("id");
-                            String name = WordUtils.capitalizeFully(item.child(0).ownText(), ' ', '-');
 
-                            ret.add(new LaundryRoom(id, name));
-                            results.add(factory.createObjectBuilder()
-                                    .add("id", id)
-                                    .add("name", name));
-                        }
-                    }
-                } catch (Exception ex) {
-                    ex.printStackTrace();
-                }
-            } else if (response.getStatus() == 302) {
                 JsonBuilderFactory factory = Json.createBuilderFactory(null);
                 JsonArrayBuilder results = factory.createArrayBuilder();
-                String id = response.getHeaderString("Location").split("=")[1];
-                String name = "Default";
+                for (JsonValue item : obj.getJsonArray("room_data")) {
+                    if(item.getValueType().equals(JsonValue.ValueType.OBJECT)) {
+                        JsonObject lrObj = (JsonObject) item;
+                        String id = lrObj.getString("laundry_room_location");
+                        String name = WordUtils.capitalizeFully(lrObj.getString("laundry_room_name"), ' ', '-');
 
-                ret.add(new LaundryRoom(id, name));
-                results.add(factory.createObjectBuilder()
-                        .add("id", id)
-                        .add("name", name));
-            } else {
-                throw new WebApplicationException("LaundryView Request Failed", Response.Status.INTERNAL_SERVER_ERROR);
+                        ret.add(new LaundryRoom(id, name));
+                        results.add(factory.createObjectBuilder()
+                                .add("id", id)
+                                .add("name", name));
+                    }
+                }
+            } catch (Exception ex) {
+                ex.printStackTrace();
             }
+        } else if (response.getStatus() == 302) {
+            throw new WebApplicationException("LaundryView Request Failed", Response.Status.INTERNAL_SERVER_ERROR);
         }
         //cache.put("findLaundryRooms?schoolId=" + schoolId, ret);
         return ret;

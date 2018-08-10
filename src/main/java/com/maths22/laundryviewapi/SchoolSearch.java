@@ -16,9 +16,12 @@ import javax.ws.rs.client.WebTarget;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import java.io.StringReader;
+import java.net.URI;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.concurrent.Callable;
+import java.util.stream.Collectors;
 
 /**
  * Created by Jacob on 1/17/2016.
@@ -34,7 +37,7 @@ public class SchoolSearch {
         @Override
         public List<School> call() throws Exception {
             Client client = ClientBuilder.newClient();
-            WebTarget target = client.target("http://m.laundryview.com").path("submitFunctions.php").queryParam("q", name);
+            WebTarget target = client.target("https://laundryview.com").path("/api/c_locations");
 
             Response response = target.request(MediaType.APPLICATION_JSON_TYPE).get();
 
@@ -51,19 +54,28 @@ public class SchoolSearch {
                 throw new WebApplicationException("LaundryView Request Failed", Response.Status.INTERNAL_SERVER_ERROR);
             }
 
-            List<School> ret = new ArrayList<>();
+            JsonArray schools = (JsonArray) list;
+            List<School> allSchools = schools.stream()
+                    .map((v) -> {
+                        JsonObject obj = (JsonObject) v;
+                        return new School(obj.getString("school_desc_key"),
+                                WordUtils.capitalizeFully(obj.getString("school_name"), ' ', '-'));
+                    })
+                    .filter((s) -> s.getName().toLowerCase().contains(name.toLowerCase()))
+                    .collect(Collectors.toList());
 
-            if (list instanceof JsonObject) {
-                return ret;
-            } else {
-                JsonArray schools = (JsonArray) list;
-                for (JsonValue schoolV : schools) {
-                    JsonObject school = (JsonObject) schoolV;
-                    ret.add(new School(school.getString("school_desc_key"),
-                            WordUtils.capitalizeFully(school.getString("property_name"), ' ', '-')));
-                }
-                return ret;
-            }
+            List<School> startSchools = allSchools.stream()
+                    .filter((s) -> s.getName().toLowerCase().startsWith(name.toLowerCase()))
+                    .sorted(Comparator.comparing(School::getName))
+                    .collect(Collectors.toList());
+            List<School> endSchools = allSchools.stream()
+                    .filter((s) -> !s.getName().toLowerCase().startsWith(name.toLowerCase()))
+                    .sorted(Comparator.comparing(School::getName))
+                    .collect(Collectors.toList());
+            List<School> ret = new ArrayList<>();
+            ret.addAll(startSchools);
+            ret.addAll(endSchools);
+            return ret;
         }
     }
 
@@ -76,31 +88,32 @@ public class SchoolSearch {
 
         @Override
         public List<School> call() throws Exception {
-            ClientConfig cc = new ClientConfig().property(ClientProperties.FOLLOW_REDIRECTS, false);
-            Client client = ClientBuilder.newClient(cc);
-
-            WebTarget target = client.target("http://m.laundryview.com").path("lvs.php").queryParam("s", sId);
-
-            Response response = target.request(MediaType.TEXT_HTML_TYPE).get();
+            // TODO support this method?
+//            ClientConfig cc = new ClientConfig().property(ClientProperties.FOLLOW_REDIRECTS, false);
+//            Client client = ClientBuilder.newClient(cc);
+//
+//            WebTarget target = client.target("http://m.laundryview.com").path("lvs.php").queryParam("s", sId);
+//
+//            Response response = target.request(MediaType.TEXT_HTML_TYPE).get();
 
             List<School> ret = new ArrayList<>();
 
-            if (response.getStatus() == 200) {
-                try {
-                    String text = response.readEntity(String.class);
-                    Document doc = Jsoup.parse(text);
-                    Elements items = doc.getElementById("rooms").children();
-
-                    if (items.size() > 0) {
-                        String name = items.get(0).text();
-                        ret.add(new School(sId, WordUtils.capitalizeFully(name)));
-                    }
-                } catch (Exception ex) {
-                    ex.printStackTrace();
-                }
-            } else if (response.getStatus() == 302) {
-                ret.add(new School(sId, "School #" + sId));
-            }
+//            if (response.getStatus() == 200) {
+//                try {
+//                    String text = response.readEntity(String.class);
+//                    Document doc = Jsoup.parse(text);
+//                    Elements items = doc.getElementById("rooms").children();
+//
+//                    if (items.size() > 0) {
+//                        String name = items.get(0).text();
+//                        ret.add(new School(sId, WordUtils.capitalizeFully(name)));
+//                    }
+//                } catch (Exception ex) {
+//                    ex.printStackTrace();
+//                }
+//            } else if (response.getStatus() == 302) {
+//                ret.add(new School(sId, "School #" + sId));
+//            }
             return ret;
         }
     }
@@ -114,25 +127,27 @@ public class SchoolSearch {
 
         @Override
         public List<School> call() throws Exception {
-            Client client = ClientBuilder.newClient();
-            WebTarget target = client.target("http://m.laundryview.com")
-                    .path("submitFunctions.php")
-                    .queryParam("monitor", "true")
-                    .queryParam("lr", rId);
+            // TODO support this method?
+//            Client client = ClientBuilder.newClient();
 
-            Response response = target.request(MediaType.TEXT_HTML_TYPE).get();
+//            WebTarget target = client.target("http://m.laundryview.com")
+//                    .path("submitFunctions.php")
+//                    .queryParam("monitor", "true")
+//                    .queryParam("lr", rId);
+//
+//            Response response = target.request(MediaType.TEXT_HTML_TYPE).get();
 
             List<School> ret = new ArrayList<>();
 
-            if (response.getStatus() == 200) {
-                try {
-                    String text = response.readEntity(String.class);
-                    JsonObject error = Json.createReader(new StringReader(text)).readObject();
-                } catch (Exception ex) {
-                    //The server only returns JSON on errors!
-                    ret.add(new School("r_" + rId, "Laundry room #" + rId));
-                }
-            }
+//            if (response.getStatus() == 200) {
+//                try {
+//                    String text = response.readEntity(String.class);
+//                    JsonObject error = Json.createReader(new StringReader(text)).readObject();
+//                } catch (Exception ex) {
+//                    //The server only returns JSON on errors!
+//                    ret.add(new School("r_" + rId, "Laundry room #" + rId));
+//                }
+//            }
             return ret;
         }
     }
@@ -148,14 +163,14 @@ public class SchoolSearch {
         public List<School> call() throws Exception {
             ClientConfig cc = new ClientConfig().property(ClientProperties.FOLLOW_REDIRECTS, false);
             Client client = ClientBuilder.newClient(cc);
-            WebTarget target = client.target("http://m.laundryview.com")
+            WebTarget target = client.target("https://laundryview.com")
                     .path(link);
 
             Response response = target.request(MediaType.TEXT_HTML_TYPE).get();
 
             List<School> ret = new ArrayList<>();
             if (response.getStatus() == 302) {
-                String id = response.getHeaderString("Location").split("=")[1];
+                String id = new URI(response.getHeaderString("Location")).getQuery().split("=")[1];
                 ret.add(new School(id, link));
             }
             return ret;
