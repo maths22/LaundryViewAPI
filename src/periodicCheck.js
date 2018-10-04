@@ -1,4 +1,5 @@
 import * as admin from 'firebase-admin';
+import {decode} from "firebase-encode";
 
 let laundryViewEndpoint = null;
 
@@ -21,6 +22,10 @@ function run() {
             const machineId = splitKey[2];
 
             laundryViewEndpoint.machineStatus({roomId}, (err, res) => {
+                if(!res) {
+                    console.log(err);
+                    return;
+                }
                 let type = 'WASHER';
                 let machine = res['washers'].find((m) => m.id === machineId);
                 if(!machine) {
@@ -40,7 +45,7 @@ function run() {
                     };
                     const dataPayload = {
                         data: {
-                            completed: key
+                            completed: decode(key)
                         }
                     };
 
@@ -48,7 +53,7 @@ function run() {
                         .then(function(response) {
                             // See the MessagingDevicesResponse reference documentation for
                             // the contents of response.
-                            console.log("Successfully sent message:", response);
+                            //TODO should I do anything here?
                         })
                         .catch(function(error) {
                             console.log("Error sending message:", error);
@@ -57,7 +62,7 @@ function run() {
                         .then(function(response) {
                             // See the MessagingDevicesResponse reference documentation for
                             // the contents of response.
-                            console.log("Successfully sent message:", response);
+                            //TODO should I do anything here?
                         })
                         .catch(function(error) {
                             console.log("Error sending message:", error);

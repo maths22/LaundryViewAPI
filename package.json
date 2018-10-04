@@ -11,6 +11,7 @@
     "body-parser": "^1.18.2",
     "express": "^4.16.1",
     "firebase-admin": "^5.4.1",
+    "firebase-encode": "0.0.5",
     "googleapis": "^22.2.0",
     "lodash": "^4.17.4"
   },

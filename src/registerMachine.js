@@ -1,5 +1,5 @@
 import * as admin from 'firebase-admin';
-import uniq from 'lodash';
+import {encode} from "firebase-encode";
 
 function fail(res) {
     res.status(400).json({status:"bad request"});
@@ -11,7 +11,7 @@ export function register (req, res) {
     // TODO verify format of the ids
 
     const db = admin.database();
-    const ref = db.ref(`machines/${req.body.machineId}`);
+    const ref = db.ref(`machines/${encode(req.body.machineId)}`);
     ref.transaction(function(currentData) {
         if (currentData === null) {
             return { [req.body.requesterId]: true };
@@ -30,7 +30,7 @@ export function unregister (req, res) {
     // TODO verify format of the ids
 
     const db = admin.database();
-    const ref = db.ref(`machines/${req.body.machineId}/${req.body.requesterId}`);
+    const ref = db.ref(`machines/${encode(req.body.machineId)}/${req.body.requesterId}`);
     ref.remove();
     res.status(200).json({status:"ok"});
 }
