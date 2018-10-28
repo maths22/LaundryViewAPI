@@ -1,27 +1,24 @@
 package com.maths22.laundryviewapi;
 
+import com.mashape.unirest.http.HttpResponse;
+import com.mashape.unirest.http.JsonNode;
+import com.mashape.unirest.http.Unirest;
+import com.mashape.unirest.http.exceptions.UnirestException;
 import com.maths22.laundryviewapi.data.School;
-import org.apache.commons.lang3.text.WordUtils;
-import org.glassfish.jersey.client.ClientConfig;
-import org.glassfish.jersey.client.ClientProperties;
-import org.jsoup.Jsoup;
-import org.jsoup.nodes.Document;
-import org.jsoup.select.Elements;
+import org.apache.commons.text.WordUtils;
+import org.apache.http.client.methods.HttpGet;
+import org.apache.http.impl.client.CloseableHttpClient;
+import org.apache.http.impl.client.HttpClients;
+import org.json.JSONArray;
+import org.json.JSONObject;
 
-import javax.json.*;
-import javax.ws.rs.WebApplicationException;
-import javax.ws.rs.client.Client;
-import javax.ws.rs.client.ClientBuilder;
-import javax.ws.rs.client.WebTarget;
-import javax.ws.rs.core.MediaType;
-import javax.ws.rs.core.Response;
-import java.io.StringReader;
+import java.io.IOException;
 import java.net.URI;
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.List;
+import java.util.*;
 import java.util.concurrent.Callable;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
+import java.util.stream.StreamSupport;
 
 /**
  * Created by Jacob on 1/17/2016.
@@ -35,29 +32,32 @@ public class SchoolSearch {
         }
 
         @Override
-        public List<School> call() throws Exception {
-            Client client = ClientBuilder.newClient();
-            WebTarget target = client.target("https://laundryview.com").path("/api/c_locations");
-
-            Response response = target.request(MediaType.APPLICATION_JSON_TYPE).get();
-
-            JsonStructure list;
-
-            if (response.getStatus() == 200) {
-                String text = response.readEntity(String.class);
-                try (JsonReader jsonReader = Json.createReader(new StringReader(text))) {
-                    list = jsonReader.read();
-                } catch (JsonException ex) {
-                    throw new WebApplicationException("LaundryView Request Failed", Response.Status.INTERNAL_SERVER_ERROR);
-                }
-            } else {
-                throw new WebApplicationException("LaundryView Request Failed", Response.Status.INTERNAL_SERVER_ERROR);
+        public List<School> call() {
+            HttpResponse<JsonNode> response;
+            try {
+                response = Unirest.get("https://laundryview.com/api/c_locations")
+                        .asJson();
+            } catch (UnirestException e) {
+                e.printStackTrace();
+                throw new RuntimeException("LaundryView Request Failed");
             }
 
-            JsonArray schools = (JsonArray) list;
-            List<School> allSchools = schools.stream()
+            JSONArray list;
+
+            if (response.getStatus() == 200) {
+                list = response.getBody().getArray();
+            } else {
+                throw new RuntimeException("LaundryView Request Failed");
+            }
+
+            Iterator<Object> schools = list.iterator();
+            Stream<Object> schoolsStream = StreamSupport.stream(
+                    Spliterators.spliteratorUnknownSize(schools, Spliterator.ORDERED),
+                    false
+            );
+            List<School> allSchools = schoolsStream
                     .map((v) -> {
-                        JsonObject obj = (JsonObject) v;
+                        JSONObject obj = (JSONObject) v;
                         return new School(obj.getString("school_desc_key"),
                                 WordUtils.capitalizeFully(obj.getString("school_name"), ' ', '-'));
                     })
@@ -155,22 +155,28 @@ public class SchoolSearch {
     public static class SearchByLink implements Callable<List<School>> {
         private final String link;
 
+        private CloseableHttpClient noRedirectClient = HttpClients.custom()
+                .disableRedirectHandling()
+                .build();
+
         public SearchByLink(String link) {
             this.link = link;
         }
 
         @Override
         public List<School> call() throws Exception {
-            ClientConfig cc = new ClientConfig().property(ClientProperties.FOLLOW_REDIRECTS, false);
-            Client client = ClientBuilder.newClient(cc);
-            WebTarget target = client.target("https://laundryview.com")
-                    .path(link);
+            org.apache.http.HttpResponse response;
+            HttpGet request = new HttpGet("https://www.laundryview.com/" + link);
+            try {
+                response = noRedirectClient.execute(request);
+            } catch (IOException e) {
+                throw new RuntimeException("LaundryView Request Failed");
+            }
 
-            Response response = target.request(MediaType.TEXT_HTML_TYPE).get();
 
             List<School> ret = new ArrayList<>();
-            if (response.getStatus() == 302) {
-                String id = new URI(response.getHeaderString("Location")).getQuery().split("=")[1];
+            if (response.getStatusLine().getStatusCode() == 302) {
+                String id = new URI(response.getFirstHeader("Location").getValue()).getQuery().split("=")[1];
                 ret.add(new School(id, link));
             }
             return ret;

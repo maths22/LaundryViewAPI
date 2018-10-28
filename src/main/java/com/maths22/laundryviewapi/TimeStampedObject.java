@@ -1,6 +1,5 @@
 package com.maths22.laundryviewapi;
 
-import com.sun.org.apache.xml.internal.utils.SerializableLocatorImpl;
 import org.joda.time.DateTime;
 
 import java.io.Serializable;
@@ -16,6 +15,10 @@ public class TimeStampedObject<T> implements Serializable {
     public TimeStampedObject(T object, DateTime time) {
         this.object = object;
         this.time = time;
+    }
+
+    private TimeStampedObject() {
+
     }
 
     public void setTime(DateTime time) {

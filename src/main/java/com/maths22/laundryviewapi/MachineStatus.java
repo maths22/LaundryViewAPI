@@ -1,37 +1,25 @@
 package com.maths22.laundryviewapi;
 
-import com.google.appengine.api.memcache.stdimpl.GCacheFactory;
+import com.mashape.unirest.http.HttpResponse;
+import com.mashape.unirest.http.JsonNode;
+import com.mashape.unirest.http.Unirest;
+import com.mashape.unirest.http.exceptions.UnirestException;
 import com.maths22.laundryviewapi.data.Machine;
 import com.maths22.laundryviewapi.data.RoomMachineStatus;
 import com.maths22.laundryviewapi.data.Status;
-import org.apache.commons.lang3.text.WordUtils;
-import org.jsoup.Jsoup;
-import org.jsoup.nodes.Document;
-import org.jsoup.nodes.Element;
-import org.jsoup.select.Elements;
+import org.apache.http.impl.client.CloseableHttpClient;
+import org.apache.http.impl.client.HttpClients;
+import org.json.JSONObject;
 
-import javax.cache.Cache;
-import javax.cache.CacheException;
-import javax.cache.CacheFactory;
-import javax.cache.CacheManager;
-import javax.json.*;
-import javax.ws.rs.*;
-import javax.ws.rs.client.Client;
-import javax.ws.rs.client.ClientBuilder;
-import javax.ws.rs.client.WebTarget;
-import javax.ws.rs.core.MediaType;
-import javax.ws.rs.core.Response;
-import java.io.StringReader;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.TimeUnit;
 
 /**
  * Root resource (exposed at "myresource" path)
  */
-@Path("machineStatus/{roomId}")
 public class MachineStatus {
+
+    private CloseableHttpClient redirectClient = HttpClients.custom()
+            .disableRedirectHandling()
+            .build();
 
     /**
      * Method handling HTTP GET requests. The returned object will be sent to
@@ -40,31 +28,31 @@ public class MachineStatus {
      * @param roomId School to list rooms of
      * @return String that will be returned as a text/plain response.
      */
-    @GET
-    @Produces(MediaType.APPLICATION_JSON)
-    public RoomMachineStatus lookup(@PathParam("roomId") String roomId) {
-
-
-        Client client = ClientBuilder.newClient();
-        WebTarget target = client.target("https://laundryview.com")
-                .path("api/currentRoomData")
-                .queryParam("location", roomId);
-
-        Response response = target.request(MediaType.APPLICATION_JSON).get();
+    public RoomMachineStatus lookup(String roomId) {
+        HttpResponse<JsonNode> response;
+        Unirest.setHttpClient(redirectClient);
+        try {
+            response = Unirest.get("https://laundryview.com/api/currentRoomData")
+                    .queryString("location", roomId)
+                    .asJson();
+        } catch (UnirestException e) {
+            e.printStackTrace();
+            throw new RuntimeException("LaundryView Request Failed");
+        }
 
         RoomMachineStatus ret = new RoomMachineStatus();
 
         if (response.getStatus() == 200) {
             try {
-                String text = response.readEntity(String.class);
-                JsonReaderFactory readerFactory = Json.createReaderFactory(null);
-                JsonObject rootObj = readerFactory.createReader(new StringReader(text)).readObject();
+                JsonNode node = response.getBody();
+
+                JSONObject rootObj = node.getObject();
 
 
-                for (JsonValue item : rootObj.getJsonArray("objects")) {
-                    JsonObject obj = (JsonObject) item;
+                for (Object item : rootObj.getJSONArray("objects")) {
+                    JSONObject obj = (JSONObject) item;
 
-                    if(obj.containsKey("appliance_type")) {
+                    if(obj.has("appliance_type")) {
                         String itemType = obj.getString("appliance_type");
                         String id = obj.getString("appliance_desc_key");
                         String number = obj.getString("appliance_desc");
@@ -97,8 +85,8 @@ public class MachineStatus {
                         }
                     }
 
-                    if(obj.containsKey("appliance_type2") || obj.getString("type").equals("washNdry")) {
-                        String itemType = obj.containsKey("appliance_type2") ? obj.getString("appliance_type2") : null;
+                    if(obj.has("appliance_type2") || obj.getString("type").equals("washNdry")) {
+                        String itemType = obj.has("appliance_type2") ? obj.getString("appliance_type2") : null;
                         // It must be that obj.getString("type").equals("washNdry")
                         if(itemType == null) {
                             itemType = "W";
@@ -141,7 +129,7 @@ public class MachineStatus {
                 ex.printStackTrace();
             }
         } else {
-            throw new WebApplicationException("LaundryView Request Failed", Response.Status.INTERNAL_SERVER_ERROR);
+            throw new RuntimeException("LaundryView Request Failed");
         }
 
         return ret;
