@@ -86,5 +86,4 @@ hs_err_pid*
 **/.terraform/*
 
 # .tfstate files
-*.tfstate
 *.tfstate.*
