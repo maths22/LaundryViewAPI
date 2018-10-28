@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="WebServers">
+    <option name="servers">
+      <webServer id="a6b7a8c1-d332-4aab-8c0d-58e10e80eb00" name="mail.maths22.com" url="http://mail.maths22.com">
+        <fileTransfer host="mail.maths22.com" port="22" privateKey="D:\Profile\Jacob\Downloads\aws-ssh.ppk" rootFolder="/home/ubuntu" accessType="SFTP" keyPair="true">
+          <advancedOptions>
+            <advancedOptions dataProtectionLevel="Private" />
+          </advancedOptions>
+          <option name="port" value="22" />
+        </fileTransfer>
+      </webServer>
+    </option>
+  </component>
+</project>

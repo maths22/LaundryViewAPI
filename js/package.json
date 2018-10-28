@@ -1,0 +1,23 @@
+{
+  "name": "laundryviewserver",
+  "version": "0.0.1",
+  "private": true,
+  "scripts": {
+    "start": "nodemon --exec babel-node src/server.js",
+    "transpile": "babel src --out-dir lib --copy-files"
+  },
+  "dependencies": {
+    "babel-preset-node6": "^11.0.0",
+    "body-parser": "^1.18.2",
+    "express": "^4.16.1",
+    "firebase-admin": "^5.4.1",
+    "firebase-encode": "0.0.5",
+    "googleapis": "^22.2.0",
+    "lodash": "^4.17.4"
+  },
+  "devDependencies": {
+    "babel-cli": "^6.26.0",
+    "babel-plugin-inline-json-import": "^0.2.1",
+    "nodemon": "^1.12.1"
+  }
+}
