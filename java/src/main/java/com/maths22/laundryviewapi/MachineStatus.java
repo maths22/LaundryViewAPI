@@ -17,10 +17,6 @@ import org.json.JSONObject;
  */
 public class MachineStatus {
 
-    private CloseableHttpClient redirectClient = HttpClients.custom()
-            .disableRedirectHandling()
-            .build();
-
     /**
      * Method handling HTTP GET requests. The returned object will be sent to
      * the client as "text/plain" media type.
@@ -30,13 +26,13 @@ public class MachineStatus {
      */
     public RoomMachineStatus lookup(String roomId) {
         HttpResponse<JsonNode> response;
-        Unirest.setHttpClient(redirectClient);
         try {
             response = Unirest.get("https://laundryview.com/api/currentRoomData")
                     .queryString("location", roomId)
                     .asJson();
         } catch (UnirestException e) {
             e.printStackTrace();
+
             throw new RuntimeException("LaundryView Request Failed");
         }
 

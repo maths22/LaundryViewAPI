@@ -34,9 +34,19 @@ data "aws_iam_policy_document" "lvapi_lambda_policy" {
   statement {
     actions = [
       "dynamodb:GetItem",
-      "dynamodb:PutItem"
+      "dynamodb:PutItem",
+      "dynamodb:DeleteItem",
+      "dynamodb:Scan",
     ]
-    resources = ["${aws_dynamodb_table.api_cache_table.arn}"]
+    resources = [
+      "${aws_dynamodb_table.api_cache_table.arn}",
+      "${aws_dynamodb_table.api_notifications_table.arn}"
+    ]
+  }
+
+  statement {
+    actions = ["secretsmanager:*"]
+    resources = ["${aws_secretsmanager_secret.firebase_secret.arn}"]
   }
 
 

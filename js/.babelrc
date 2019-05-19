@@ -1,8 +1,0 @@
-{
-  "presets": [
-    "node6"
-  ],
-  "plugins": [
-    ["inline-json-import", {}]
-  ]
-}
