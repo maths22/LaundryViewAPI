@@ -11,7 +11,7 @@ resource "aws_dynamodb_table" "api_cache_table" {
 
   ttl {
     attribute_name = "TimeToExist"
-    enabled = true
+    enabled        = true
   }
 }
 
@@ -20,7 +20,7 @@ resource "aws_dynamodb_table" "api_notifications_table" {
   read_capacity  = 10
   write_capacity = 10
   hash_key       = "RequesterId"
-  range_key       = "MachineId"
+  range_key      = "MachineId"
 
   attribute {
     name = "RequesterId"
@@ -34,6 +34,6 @@ resource "aws_dynamodb_table" "api_notifications_table" {
 
   ttl {
     attribute_name = "TimeToExist"
-    enabled = true
+    enabled        = true
   }
 }
