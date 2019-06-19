@@ -81,11 +81,11 @@ public class MachineStatus {
                         }
                     }
 
-                    if(obj.has("appliance_type2") || obj.getString("type").equals("washNdry")) {
+                    if(obj.has("appliance_type2") || obj.getString("type").equals("washNdry") || obj.getString("type").equals("dblDry")) {
                         String itemType = obj.has("appliance_type2") ? obj.getString("appliance_type2") : null;
                         // It must be that obj.getString("type").equals("washNdry")
                         if(itemType == null) {
-                            itemType = "W";
+                            itemType =  obj.getString("type").equals("washNdry") ? "W" : "D";
                         }
                         String id = obj.getString("appliance_desc_key2");
                         String number = obj.getString("appliance_desc2");
