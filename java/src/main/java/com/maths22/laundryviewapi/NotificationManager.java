@@ -151,14 +151,20 @@ public class NotificationManager {
                 System.out.println(mac.getId() + " " + mac.getStatus());
                 if (mac.getStatus().equals(Status.AVAILBLE) || mac.getStatus().equals(Status.DONE)) {
                     Message message = Message.builder()
+                            .setNotification(new Notification(
+                                type.equals("WASHER") ? "Washing Machine Done" : "Dryer Done",
+                                lrName + ": Machine #" + mac.getNumber()
+                            ))
                             .setAndroidConfig(AndroidConfig.builder()
                                     .setNotification(AndroidNotification.builder()
-                                            .setTitle(type.equals("WASHER") ? "Washing Machine Done" : "Dryer Done")
-                                            .setBody(lrName + ": Machine #" + mac.getNumber())
                                             .setIcon("washing_machine")
                                             .setSound("default")
                                             .setColor("#000075")
                                             .build()).build())
+                            // .setApnsConfig(ApnsConfig.builder()
+                            //         .setAps(Aps.builder()
+                            //                     .build())
+                            //                 .build())
                             //                        .setToken(item.getString("RequesterId"))
                             //                        .build();
                             //
